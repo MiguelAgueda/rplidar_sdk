@@ -2,24 +2,11 @@
 #include <stdlib.h>
 
 #include "rplidar.h" //RPLIDAR standard sdk, all-in-one header
+#include "i2c_comm.h"
+
 
 #ifndef _countof
 #define _countof(_Array) (int)(sizeof(_Array) / sizeof(_Array[0]))
-#endif
-
-#ifdef _WIN32
-#include <Windows.h>
-#define delay(x)   ::Sleep(x)
-#else
-#include <unistd.h>
-static inline void delay(_word_size_t ms) {
-	while (ms >= 1000) {
-		usleep(1000 * 1000);
-		ms -= 1000;
-	};
-	if (ms != 0)
-		usleep(ms * 1000);
-}
 #endif
 
 using namespace rp::standalone::rplidar;
@@ -65,28 +52,17 @@ int main(int argc, const char* argv[]) {
 
 	bool useArgcBaudrate = false;
 
-	printf("Ultra simple LIDAR data grabber for RPLIDAR.\n"
-		"Version: " RPLIDAR_SDK_VERSION "\n");
-
 	// read serial port from the command line...
-	if (argc > 1) opt_com_path = argv[1]; // or set to a fixed value: e.g. "com3"
+	if (argc > 1) 
+		opt_com_path = argv[1];
+	else
+		opt_com_path = "/dev/ttyUSB0";
 
 	// read baud rate from the command line if specified...
 	if (argc > 2)
 	{
 		opt_com_baudrate = strtoul(argv[2], NULL, 10);
 		useArgcBaudrate = true;
-	}
-
-	if (!opt_com_path) {
-#ifdef _WIN32
-		// use default com port
-		opt_com_path = "\\\\.\\com8";
-#elif __APPLE__
-		opt_com_path = "/dev/tty.SLAB_USBtoUART";
-#else
-		opt_com_path = "/dev/ttyUSB0";
-#endif
 	}
 
 	// create the driver instance
@@ -142,7 +118,8 @@ int main(int argc, const char* argv[]) {
 			}
 		}
 	}
-	if (!connectSuccess) {
+	if (!connectSuccess) 
+	{
 		fprintf(stderr, "Error, cannot bind to the specified serial port %s.\n"
 			, opt_com_path);
 		goto on_finished;
@@ -169,34 +146,28 @@ int main(int argc, const char* argv[]) {
 	signal(SIGINT, ctrlc);
 
 	drv->startMotor();
-	// start scan...
+	// Start scan.
 	RplidarScanMode scanMode;
 	drv -> startScan(false, true, 0, &scanMode);
 	//drv->startScan(0, 1);
 
-	// fetech result and print it out...
-	while (1) {
+	// fetch result and print it out...
+	while (true) {
 		rplidar_response_measurement_node_hq_t nodes[8192];  // Supposed to be better.
-		//rplidar_response_measurement_node_t nodes[8192];  // Older method.
 		size_t   count = _countof(nodes);
 
 		op_result = drv->grabScanDataHq(nodes, count);  // Hq method coincides with rplidar_..._node_hq_t.
-		//op_result = drv->grabScanData(nodes, count);  // Base method coincides with rplidar_..._node_t.
 		for (int pos = 0; pos < (int)count; ++pos) {
 			
 			float angle = nodes[pos].angle_z_q14 * 90.f / (1 << 14);
-			float distance = nodes[pos].dist_mm_q2 / 1000.f / (1 << 2);
-			//float angle = (nodes[pos].angle_q6_checkbit >> RPLIDAR_RESP_MEASUREMENT_ANGLE_SHIFT) / 64.0f;
-			//float distance = nodes[pos].distance_q2 / 4.0f;
+			float distance = nodes[pos].dist_mm_q2 / (1 << 2);
 
 			if ((int)angle > 315 || (int)angle < 45)
 			{
 				printf("theta: %03.2f Dist: %08.2f\n", angle, distance);
+				// write_buffer(angle, distance);
 			}
-			else
-			{
-				//printf("Angle: %03.2f not in range!\n", angle);
-			}
+
 		}
 
 		if (ctrl_c_pressed) {
