@@ -1,16 +1,16 @@
 #include "i2c_comm.h"
 
 
-
-bool write_buffer(float angle, float distance)
+bool write_buffer()
 {
-	printf("Got to method!");
+	// printf("Got to method!");
 	int file_i2c;
 	int length = 3;  //<<< Number of bytes to write
 	int addr = 0x04;  //<<<<<The I2C address of the slave.
-	unsigned char * buffer = {0};
-	buffer[1] = 0x03;
-	buffer[2] = 0x07;
+	int8_t buffer[3];
+	buffer[0] = 0; 
+	buffer[1] = -3;
+	buffer[2] = 6;
 
 	char *filename = (char*)"/dev/i2c-7";
 

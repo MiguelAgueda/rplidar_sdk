@@ -1,73 +1,105 @@
 #include <stdio.h>
 #include <stdlib.h>
-
-#include "rplidar.h" //RPLIDAR standard sdk, all-in-one header
+#include <signal.h>
+#include <iostream>
+// #include <unistd.h>				//Needed for I2C port
+// #include <fcntl.h>				//Needed for I2C port
+// #include <sys/ioctl.h>			//Needed for I2C port
+// #include <linux/i2c-dev.h>		//Needed for I2C port
 #include "i2c_comm.h"
 
+
+#include "rplidar.h" //RPLIDAR standard sdk, all-in-one header
+// #include "i2c_comm.h"
+
+using namespace rp::standalone::rplidar;
+
+RPlidarDriver * driver;
+u_result     op_result;
 
 #ifndef _countof
 #define _countof(_Array) (int)(sizeof(_Array) / sizeof(_Array[0]))
 #endif
 
-using namespace rp::standalone::rplidar;
-
-bool checkRPLIDARHealth(RPlidarDriver* drv)
-{
-	u_result     op_result;
-	rplidar_response_device_health_t healthinfo;
-
-	op_result = drv->getHealth(healthinfo);
-	if (IS_OK(op_result))
-	{ // the macro IS_OK is the preperred way to judge whether the operation is succeed.
-		printf("RPLidar health status : %d\n", healthinfo.status);
-		if (healthinfo.status == RPLIDAR_STATUS_ERROR)
-		{
-			fprintf(stderr, "Error, rplidar internal error detected. Please reboot the device to retry.\n");
-			// enable the following code if you want rplidar to be reboot by software
-			// drv->reset();
-			return false;
-	}
-		else {
-			return true;
-		}
-}
-	else {
-		fprintf(stderr, "Error, cannot retrieve the lidar health code: %x\n", op_result);
-		return false;
-	}
-}
-
-#include <signal.h>
 bool ctrl_c_pressed;
+
+int file_i2c;
+int length = 3;  //<<< Number of bytes to write
+int addr = 0x04;  //<<<<<The I2C address of the slave.
+unsigned char * buffer[3] = {0};
+char *filename = (char*)"/dev/i2c-7";
+
+// void write_to_i2c()
+// {
+// 	printf("Got to method!\n");
+
+// 	// buffer[1] = 0x03;
+// 	// buffer[2] = 0x07;
+// 	if ((file_i2c = open(filename, O_RDWR)) < 0)
+// 	{
+// 		printf("Error No. %d", file_i2c);
+// 		//ERROR HANDLING: you can check errno to see what went wrong.
+// 		printf("Failed to open the i2c bus");
+// 		// return false;
+// 	}
+	
+// 	if (ioctl(file_i2c, I2C_SLAVE, addr) < 0)
+// 	{
+// 		printf("Failed to acquire bus access and/or talk to slave.\n");
+// 		// return false;
+// 	}
+// 	//write() returns the number of bytes actually written, if it doesn't match then an error occurred (e.g. no response from the device)
+// 	if (write(file_i2c, buffer, length) != length)  
+// 	{
+// 		/* ERROR HANDLING: i2c transaction failed */
+// 		printf("Failed to write to the i2c bus.\n");
+// 		// return false;
+// 	}
+
+// 	// return true;
+// }
+
+
 void ctrlc(int)
 {
 	ctrl_c_pressed = true;
 }
 
-int main(int argc, const char* argv[]) {
-	const char* opt_com_path = NULL;
-	_u32         baudrateArray[2] = { 115200, 256000 };
-	_u32         opt_com_baudrate = 0;
-	u_result     op_result;
+bool checkRPLIDARHealth(RPlidarDriver* driver)
+{
+	u_result op_result;
+	rplidar_response_device_health_t healthinfo;
 
-	bool useArgcBaudrate = false;
-
-	// read serial port from the command line...
-	if (argc > 1) 
-		opt_com_path = argv[1];
-	else
-		opt_com_path = "/dev/ttyUSB0";
-
-	// read baud rate from the command line if specified...
-	if (argc > 2)
+	op_result = driver->getHealth(healthinfo);
+	if (IS_OK(op_result))
 	{
-		opt_com_baudrate = strtoul(argv[2], NULL, 10);
-		useArgcBaudrate = true;
+		printf("RPLidar health status : %d\n", healthinfo.status);
+		if (healthinfo.status == RPLIDAR_STATUS_ERROR)
+		{
+			fprintf(stderr, "Error, rplidar internal error detected. Please reboot the device to retry.\n");
+			// enable the following code if you want rplidar to be reboot by software
+			// driver->reset();
+			return false;
+		}
+		else {
+			return true;
+		}
 	}
+	else 
+	{
+		fprintf(stderr, "Error, cannot retrieve the lidar health code: %x\n", op_result);
+		return false;
+	}
+}
+
+void setup_lidar()
+{
+	const char* opt_com_path = NULL;
+	opt_com_path = "/dev/ttyUSB0";
 
 	// create the driver instance
-	RPlidarDriver* drv = RPlidarDriver::CreateDriver(DRIVER_TYPE_SERIALPORT);
-	if (!drv) {
+	driver = RPlidarDriver::CreateDriver(DRIVER_TYPE_SERIALPORT);
+	if (!driver) {
 		fprintf(stderr, "insufficent memory, exit\n");
 		exit(-2);
 	}
@@ -75,54 +107,29 @@ int main(int argc, const char* argv[]) {
 	rplidar_response_device_info_t devinfo;
 	bool connectSuccess = false;
 	// make connection...
-	if (useArgcBaudrate)
+	driver = RPlidarDriver::CreateDriver(DRIVER_TYPE_SERIALPORT);
+	if (IS_OK(driver->connect(opt_com_path, 115200)))
 	{
-		if (!drv)
-			drv = RPlidarDriver::CreateDriver(DRIVER_TYPE_SERIALPORT);
-		if (IS_OK(drv->connect(opt_com_path, opt_com_baudrate)))
-		{
-			op_result = drv->getDeviceInfo(devinfo);
+		op_result = driver->getDeviceInfo(devinfo);
 
-			if (IS_OK(op_result))
-			{
-				connectSuccess = true;
-			}
-			else
-			{
-				delete drv;
-				drv = NULL;
-			}
+		if (IS_OK(op_result))
+		{
+			connectSuccess = true;
+		}
+		else
+		{
+			delete driver;
+			driver = NULL;
 		}
 	}
-	else
-	{
-		size_t baudRateArraySize = (sizeof(baudrateArray)) / (sizeof(baudrateArray[0]));
-		for (size_t i = 0; i < baudRateArraySize; ++i)
-		{
-			if (!drv)
-				drv = RPlidarDriver::CreateDriver(DRIVER_TYPE_SERIALPORT);
-			if (IS_OK(drv->connect(opt_com_path, baudrateArray[i])))
-			{
-				op_result = drv->getDeviceInfo(devinfo);
 
-				if (IS_OK(op_result))
-				{
-					connectSuccess = true;
-					break;
-				}
-				else
-				{
-					delete drv;
-					drv = NULL;
-				}
-			}
-		}
-	}
 	if (!connectSuccess) 
 	{
 		fprintf(stderr, "Error, cannot bind to the specified serial port %s.\n"
 			, opt_com_path);
-		goto on_finished;
+
+	 	RPlidarDriver::DisposeDriver(driver);
+	 	driver = NULL;
 	}
 
 	// print out the device serial number, firmware and hardware version number..
@@ -139,47 +146,72 @@ int main(int argc, const char* argv[]) {
 		, (int)devinfo.hardware_version);
 
 	// check health...
-	if (!checkRPLIDARHealth(drv)) {
-		goto on_finished;
+	if (!checkRPLIDARHealth(driver)) {
+		// goto on_finished;
+	 	RPlidarDriver::DisposeDriver(driver);
+	 	driver = NULL;
 	}
 
-	signal(SIGINT, ctrlc);
+	// on_finished:
+	// 	RPlidarDriver::DisposeDriver(driver);
+	// 	driver = NULL;
+}
 
-	drv->startMotor();
-	// Start scan.
-	RplidarScanMode scanMode;
-	drv -> startScan(false, true, 0, &scanMode);
-	//drv->startScan(0, 1);
 
-	// fetch result and print it out...
-	while (true) {
-		rplidar_response_measurement_node_hq_t nodes[8192];  // Supposed to be better.
-		size_t   count = _countof(nodes);
+// tuple<double, double> get_measurement()
+// {
 
-		op_result = drv->grabScanDataHq(nodes, count);  // Hq method coincides with rplidar_..._node_hq_t.
-		for (int pos = 0; pos < (int)count; ++pos) {
+// }
+
+int main(int argc, const char* argv[]) 
+{
+
+	printf("Got here");
+	// while (true)
+	// {
+		// write_to_i2c();
+		write_buffer();
+	// }
+
+	// setup_lidar();
+	// signal(SIGINT, ctrlc);
+
+	// printf("Got Here");
+	// driver->startMotor();
+	// // Start scan.
+	// RplidarScanMode scanMode;
+	// driver -> startScan(false, true, 0, &scanMode);
+	// //driver->startScan(0, 1);
+
+	// // fetch result and print it out...
+	// while (true) {
+	// 	rplidar_response_measurement_node_hq_t nodes[8192];  // Supposed to be better.
+	// 	size_t   count = _countof(nodes);
+
+	// 	op_result = driver->grabScanDataHq(nodes, count);  // Hq method coincides with rplidar_..._node_hq_t.
+		
+
+	// 	for (int pos = 0; pos < (int)count; ++pos) 
+	// 	{
 			
-			float angle = nodes[pos].angle_z_q14 * 90.f / (1 << 14);
-			float distance = nodes[pos].dist_mm_q2 / (1 << 2);
+	// 		float angle = nodes[pos].angle_z_q14 * 90.f / (1 << 14);
+	// 		float distance = nodes[pos].dist_mm_q2 / (1 << 2);
 
-			if ((int)angle > 315 || (int)angle < 45)
-			{
-				printf("theta: %03.2f Dist: %08.2f\n", angle, distance);
-				// write_buffer(angle, distance);
-			}
+	// 		if ((int)angle > 315 || (int)angle < 45)
+	// 		{
+	// 			printf("theta: %03.2f Dist: %08.2f\n", angle, distance);
+	// 			// write_buffer(angle, distance);
+	// 		}
 
-		}
+	// 	}
 
-		if (ctrl_c_pressed) {
-			break;
-		}
-	}
+	// 	if (ctrl_c_pressed) {
+	// 		break;
+	// 	}
+	// }
 
-	drv->stop();
-	drv->stopMotor();
+	// driver->stop();
+	// driver->stopMotor();
 
-on_finished:
-	RPlidarDriver::DisposeDriver(drv);
-	drv = NULL;
-	return 0;
+
 }

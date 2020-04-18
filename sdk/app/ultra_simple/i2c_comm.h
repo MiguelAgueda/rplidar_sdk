@@ -6,4 +6,4 @@
 #include <stdlib.h>
 #include <iostream>
 
-bool write_buffer(float, float);
+bool write_buffer();
