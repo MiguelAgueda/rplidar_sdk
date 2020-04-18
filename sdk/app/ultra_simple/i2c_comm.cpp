@@ -1,16 +1,16 @@
 #include "i2c_comm.h"
 
 
-bool write_buffer()
+bool write_buffer(int8_t theta, int8_t drive)
 {
 	// printf("Got to method!");
 	int file_i2c;
 	int length = 3;  //<<< Number of bytes to write
 	int addr = 0x04;  //<<<<<The I2C address of the slave.
 	int8_t buffer[3];
-	buffer[0] = 0; 
-	buffer[1] = -3;
-	buffer[2] = 6;
+	buffer[0] = 0;  // Starting Bit.
+	buffer[1] = theta;  // Theta instruction.
+	buffer[2] = drive;  // Drive instruction.
 
 	char *filename = (char*)"/dev/i2c-7";
 

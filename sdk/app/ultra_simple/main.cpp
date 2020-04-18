@@ -169,49 +169,62 @@ int main(int argc, const char* argv[])
 	printf("Got here");
 	// while (true)
 	// {
-		// write_to_i2c();
-		write_buffer();
+	// 	// write_to_i2c();
+	// 	printf("Sending Data\n");
+	// 	write_buffer(0, 1);
 	// }
 
-	// setup_lidar();
-	// signal(SIGINT, ctrlc);
+	setup_lidar();
+	signal(SIGINT, ctrlc);
 
-	// printf("Got Here");
-	// driver->startMotor();
-	// // Start scan.
-	// RplidarScanMode scanMode;
-	// driver -> startScan(false, true, 0, &scanMode);
-	// //driver->startScan(0, 1);
+	printf("Got Here");
+	driver->startMotor();
+	// Start scan.
+	RplidarScanMode scanMode;
+	driver -> startScan(false, true, 0, &scanMode);
+	//driver->startScan(0, 1);
 
-	// // fetch result and print it out...
-	// while (true) {
-	// 	rplidar_response_measurement_node_hq_t nodes[8192];  // Supposed to be better.
-	// 	size_t   count = _countof(nodes);
+	// fetch result and print it out...
+	while (true) {
+		rplidar_response_measurement_node_hq_t nodes[8192];  // Supposed to be better.
+		size_t   count = _countof(nodes);
 
-	// 	op_result = driver->grabScanDataHq(nodes, count);  // Hq method coincides with rplidar_..._node_hq_t.
+		op_result = driver->grabScanDataHq(nodes, count);  // Hq method coincides with rplidar_..._node_hq_t.
 		
 
-	// 	for (int pos = 0; pos < (int)count; ++pos) 
-	// 	{
+		for (int pos = 0; pos < (int)count; ++pos) 
+		{
 			
-	// 		float angle = nodes[pos].angle_z_q14 * 90.f / (1 << 14);
-	// 		float distance = nodes[pos].dist_mm_q2 / (1 << 2);
+			float angle = nodes[pos].angle_z_q14 * 90.f / (1 << 14);
+			float distance = nodes[pos].dist_mm_q2 / (1 << 2);
 
-	// 		if ((int)angle > 315 || (int)angle < 45)
-	// 		{
-	// 			printf("theta: %03.2f Dist: %08.2f\n", angle, distance);
-	// 			// write_buffer(angle, distance);
-	// 		}
+			if ((int)angle > 345 || (int)angle < 15)
+			{
+				printf("theta: %03.2f Dist: %08.2f\n", angle, distance);
+				if (distance > 300)
+				{
+					write_buffer(0, 1);
+				}
+				else
+				{
+					write_buffer(0, 0);
+				}
 
-	// 	}
+			}
 
-	// 	if (ctrl_c_pressed) {
-	// 		break;
-	// 	}
-	// }
+		}
 
-	// driver->stop();
-	// driver->stopMotor();
+		// printf("Sending Data\n");
+		// write_buffer(0, 1);
+
+		if (ctrl_c_pressed) {
+			break;
+		}
+	}
+
+	write_buffer(0, 0);
+	driver->stop();
+	driver->stopMotor();
 
 
 }
