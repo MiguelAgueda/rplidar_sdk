@@ -6,4 +6,4 @@
 #include <stdlib.h>
 #include <iostream>
 
-bool write_buffer();
+bool write_buffer(int8_t, int8_t);
